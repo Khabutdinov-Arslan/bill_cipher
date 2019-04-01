@@ -3,17 +3,18 @@ import json
 import argparse
 import sys
 import string
+import copy
 
-ALPHABET_SIZE = len(string.ascii_lowercase);
+ALPHABET_SIZE = len(string.ascii_lowercase)
+SHIFT_STRING = string.ascii_lowercase + string.ascii_lowercase + string.ascii_uppercase + string.ascii_uppercase
 
 
 def get_input(input_filename):
     if input_filename == '':
-        content = sys.stdin.read()
+        return sys.stdin.read()
     else:
         with open(input_filename, 'r') as input_file:
-            content = input_file.read()
-            return content
+            return input_file.read()
 
 
 def return_output(output_text, output_filename):
@@ -24,33 +25,37 @@ def return_output(output_text, output_filename):
             print(output_text, file=output_file, end='', sep='')
 
 
-def shift_letter(letter, shift, capital):
-    if capital == True:
-        base_shift = 65
+def get_letter_index(letter):
+    letter_index = {}
+    j = 0
+    for i in string.ascii_lowercase + string.ascii_uppercase:
+        letter_index[i] = j
+        j = (j + 1) % ALPHABET_SIZE
+    if letter in letter_index:
+        return letter_index[letter]
     else:
-        base_shift = 97
-    return chr((ord(letter) - base_shift + ALPHABET_SIZE + shift) % ALPHABET_SIZE + base_shift)
+        return None
+
+
 
 
 def process_letter(letter, shift=0):
-    if (letter >= 'A') and (letter <= 'Z'):
-        letter = shift_letter(letter, shift, True)
+    if shift < 0:
+        shift = 26 + shift
+    if get_letter_index(letter) is None:
+        return letter
     else:
-        if (letter >= 'a') and (letter <= 'z'):
-            letter = shift_letter(letter, shift, False)
-    return letter
+        letter_index = {}
+        j = 0
+        for i in string.ascii_lowercase:
+            letter_index[i] = j
+            j += 1
+        j = ALPHABET_SIZE * 2
+        for i in string.ascii_uppercase:
+            letter_index[i] = j
+            j += 1
+        return SHIFT_STRING[letter_index[letter] + shift]
 
-
-def get_letter_index(letter):
-    letter_index = ord(letter)
-    if (letter_index >= 65) and (letter_index <= 90):
-        letter_index -= 65
-    else:
-        if (letter_index >= 97) and (letter_index <= 122):
-            letter_index -= 97
-        else:
-            letter_index = -1
-    return letter_index
 
 
 def caesar(input_text, shift):
@@ -65,7 +70,7 @@ def vigenere(input_text, shift_string, mode):
     output_array = []
     for i in input_text:
         letter_index = get_letter_index(i)
-        if letter_index == -1:
+        if letter_index is None:
             output_array.append(i)
         else:
             output_array.append(process_letter(i, shifts[j] * mode))
@@ -79,20 +84,15 @@ def calculate_stats(input_text):
         letter_count[i] = 0
     for i in input_text:
         letter_index = get_letter_index(i)
-        if letter_index != -1:
+        if letter_index is not None:
             letter_count[letter_index] += 1
-    return json.dumps(letter_count)
+    return letter_count
 
 
-def calculate_difference(input_text, letter_stats):
-    letter_count = {i: 0 for i in range(ALPHABET_SIZE)}
+def calculate_difference(letter_stats_left, letter_stats_right):
     difference_module = 0
-    for i in input_text:
-        letter_index = get_letter_index(i)
-        if letter_index != -1:
-            letter_count[letter_index] += 1
-    for i in letter_count.keys():
-        difference_module += abs(letter_count[i] - letter_stats[i])
+    for i in range(ALPHABET_SIZE):
+        difference_module += abs(letter_stats_left[i] - letter_stats_right[i])
     return difference_module
 
 
@@ -101,15 +101,19 @@ def caesar_hack(input_text, stats_file=''):
         dict_content = input_file.read()
         letter_stats = json.loads(dict_content)
         letter_stats = {int(k): int(v) for k, v in letter_stats.items()}
-    best_shift = -1
-    best_difference = -1
+    best_shift = None
+    best_difference = None
+    current_stats = calculate_stats(input_text)
     for i in range(ALPHABET_SIZE):
-        current_text = caesar(input_text, -i)
-        current_difference = calculate_difference(current_text, letter_stats)
-        if (best_shift == -1) or (current_difference < best_difference):
+        current_difference = calculate_difference(current_stats, letter_stats)
+        if (best_shift is None) or (current_difference < best_difference):
             best_difference = current_difference
             best_shift = i
-    return caesar(input_text, -best_shift)
+        new_stats = {}
+        for k, v in current_stats.items():
+            new_stats[(k + 1) % ALPHABET_SIZE] = v
+        current_stats = copy.deepcopy(new_stats)
+    return caesar(input_text, best_shift)
 
 
 def encrypt_text(args):
@@ -129,7 +133,7 @@ def encrypt_text(args):
 
 def train_text(args):
     input_text = get_input(args.text_file)
-    output_text = calculate_stats(input_text)
+    output_text = json.dumps(calculate_stats(input_text))
     return_output(output_text, args.model_file)
 
 
@@ -175,5 +179,6 @@ def parser_init():
         arguments.func(arguments)
     except Exception:
         raise ValueError("Use correct argument format")
+
 
 parser_init()
