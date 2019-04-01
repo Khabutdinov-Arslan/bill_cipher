@@ -37,8 +37,6 @@ def get_letter_index(letter):
         return None
 
 
-
-
 def process_letter(letter, shift=0):
     if shift < 0:
         shift = 26 + shift
@@ -55,7 +53,6 @@ def process_letter(letter, shift=0):
             letter_index[i] = j
             j += 1
         return SHIFT_STRING[letter_index[letter] + shift]
-
 
 
 def caesar(input_text, shift):
