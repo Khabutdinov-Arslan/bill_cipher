@@ -3,10 +3,27 @@ import json
 import argparse
 import sys
 import string
-import copy
+import collections
 
 ALPHABET_SIZE = len(string.ascii_lowercase)
 SHIFT_STRING = string.ascii_lowercase + string.ascii_lowercase + string.ascii_uppercase + string.ascii_uppercase
+letter_index_without_register = {}
+letter_index_with_register = {}
+
+
+def calculate_indexes():
+    j = 0
+    for i in string.ascii_lowercase + string.ascii_uppercase:
+        letter_index_without_register[i] = j
+        j = (j + 1) % ALPHABET_SIZE
+    j = 0
+    for i in string.ascii_lowercase:
+        letter_index_with_register[i] = j
+        j += 1
+    j = ALPHABET_SIZE * 2
+    for i in string.ascii_uppercase:
+        letter_index_with_register[i] = j
+        j += 1
 
 
 def get_input(input_filename):
@@ -26,33 +43,19 @@ def return_output(output_text, output_filename):
 
 
 def get_letter_index(letter):
-    letter_index = {}
-    j = 0
-    for i in string.ascii_lowercase + string.ascii_uppercase:
-        letter_index[i] = j
-        j = (j + 1) % ALPHABET_SIZE
-    if letter in letter_index:
-        return letter_index[letter]
+    if letter in letter_index_without_register:
+        return letter_index_without_register[letter]
     else:
         return None
 
 
 def process_letter(letter, shift=0):
     if shift < 0:
-        shift = 26 + shift
+        shift = ALPHABET_SIZE + shift
     if get_letter_index(letter) is None:
         return letter
     else:
-        letter_index = {}
-        j = 0
-        for i in string.ascii_lowercase:
-            letter_index[i] = j
-            j += 1
-        j = ALPHABET_SIZE * 2
-        for i in string.ascii_uppercase:
-            letter_index[i] = j
-            j += 1
-        return SHIFT_STRING[letter_index[letter] + shift]
+        return SHIFT_STRING[letter_index_with_register[letter] + shift]
 
 
 def caesar(input_text, shift):
@@ -76,6 +79,13 @@ def vigenere(input_text, shift_string, mode):
 
 
 def calculate_stats(input_text):
+    all_characters_count = collections.Counter(input_text)
+    letter_count = {i: all_characters_count[process_letter('a', i)] + all_characters_count[process_letter('A', i)] for i
+                    in range(ALPHABET_SIZE)}
+    return letter_count
+
+
+def calculate_stats2(input_text):
     letter_count = dict()
     for i in range(ALPHABET_SIZE):
         letter_count[i] = 0
@@ -86,10 +96,11 @@ def calculate_stats(input_text):
     return letter_count
 
 
-def calculate_difference(letter_stats_left, letter_stats_right):
+def calculate_difference(letter_stats_left, letter_stats_right, shift_left=0, shift_right=0):
     difference_module = 0
     for i in range(ALPHABET_SIZE):
-        difference_module += abs(letter_stats_left[i] - letter_stats_right[i])
+        difference_module += abs(letter_stats_left[(ALPHABET_SIZE + i + shift_left) % ALPHABET_SIZE] -
+                                 letter_stats_right[(ALPHABET_SIZE + i + shift_right) % ALPHABET_SIZE])
     return difference_module
 
 
@@ -99,17 +110,13 @@ def caesar_hack(input_text, stats_file=''):
         letter_stats = json.loads(dict_content)
         letter_stats = {int(k): int(v) for k, v in letter_stats.items()}
     best_shift = None
-    best_difference = None
+    best_difference = float('inf')
     current_stats = calculate_stats(input_text)
     for i in range(ALPHABET_SIZE):
-        current_difference = calculate_difference(current_stats, letter_stats)
-        if (best_shift is None) or (current_difference < best_difference):
+        current_difference = calculate_difference(current_stats, letter_stats, -i, 0)
+        if current_difference < best_difference:
             best_difference = current_difference
             best_shift = i
-        new_stats = {}
-        for k, v in current_stats.items():
-            new_stats[(k + 1) % ALPHABET_SIZE] = v
-        current_stats = copy.deepcopy(new_stats)
     return caesar(input_text, best_shift)
 
 
@@ -140,7 +147,9 @@ def hack_text(args):
     return_output(output_text, args.output_file)
 
 
-def parser_init():
+def cipher_init():
+    calculate_indexes()
+
     parser = argparse.ArgumentParser(description='Simple encryption utility')
     subparsers = parser.add_subparsers()
 
@@ -171,11 +180,8 @@ def parser_init():
     hack_parser.add_argument('--output-file', default='')
     hack_parser.set_defaults(func=hack_text)
 
-    try:
-        arguments = parser.parse_args()
-        arguments.func(arguments)
-    except Exception:
-        raise ValueError("Use correct argument format")
+    arguments = parser.parse_args()
+    arguments.func(arguments)
 
 
-parser_init()
+cipher_init()
