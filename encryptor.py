@@ -12,18 +12,12 @@ letter_index_with_register = {}
 
 
 def calculate_indexes():
-    j = 0
-    for i in string.ascii_lowercase + string.ascii_uppercase:
-        letter_index_without_register[i] = j
-        j = (j + 1) % ALPHABET_SIZE
-    j = 0
-    for i in string.ascii_lowercase:
-        letter_index_with_register[i] = j
-        j += 1
-    j = ALPHABET_SIZE * 2
-    for i in string.ascii_uppercase:
-        letter_index_with_register[i] = j
-        j += 1
+    for i in list(enumerate(string.ascii_lowercase + string.ascii_uppercase)):
+        letter_index_without_register[i[1]] = i[0] % ALPHABET_SIZE
+    for i in list(enumerate(string.ascii_lowercase)):
+        letter_index_with_register[i[1]] = i[0]
+    for i in list(enumerate(string.ascii_uppercase, start=ALPHABET_SIZE * 2)):
+        letter_index_with_register[i[1]] = i[0]
 
 
 def get_input(input_filename):
@@ -43,23 +37,25 @@ def return_output(output_text, output_filename):
 
 
 def get_letter_index(letter):
-    if letter in letter_index_without_register:
-        return letter_index_without_register[letter]
-    else:
-        return None
+    return letter_index_without_register.get(letter)
+
+
+def get_letter_index_with_register(letter):
+    return letter_index_with_register.get(letter)
 
 
 def process_letter(letter, shift=0):
     if shift < 0:
         shift = ALPHABET_SIZE + shift
-    if get_letter_index(letter) is None:
+    letter_index = get_letter_index_with_register(letter)
+    if letter_index is None:
         return letter
     else:
-        return SHIFT_STRING[letter_index_with_register[letter] + shift]
+        return SHIFT_STRING[letter_index + shift]
 
 
 def caesar(input_text, shift):
-    return ''.join([process_letter(i, shift) for i in input_text])
+    return ''.join(process_letter(i, shift) for i in input_text)
 
 
 def vigenere(input_text, shift_string, mode):
@@ -79,28 +75,21 @@ def vigenere(input_text, shift_string, mode):
 
 
 def calculate_stats(input_text):
-    all_characters_count = collections.Counter(input_text)
-    letter_count = {i: all_characters_count[process_letter('a', i)] + all_characters_count[process_letter('A', i)] for i
-                    in range(ALPHABET_SIZE)}
-    return letter_count
-
-
-def calculate_stats2(input_text):
-    letter_count = dict()
-    for i in range(ALPHABET_SIZE):
-        letter_count[i] = 0
-    for i in input_text:
-        letter_index = get_letter_index(i)
-        if letter_index is not None:
-            letter_count[letter_index] += 1
-    return letter_count
+    all_characters_count = collections.Counter(input_text.lower())
+    stats = dict()
+    stats['letter_count'] = [all_characters_count[process_letter('a', i)] for i in range(ALPHABET_SIZE)]
+    stats['size'] = len(input_text)
+    return stats
 
 
 def calculate_difference(letter_stats_left, letter_stats_right, shift_left=0, shift_right=0):
     difference_module = 0
     for i in range(ALPHABET_SIZE):
-        difference_module += abs(letter_stats_left[(ALPHABET_SIZE + i + shift_left) % ALPHABET_SIZE] -
-                                 letter_stats_right[(ALPHABET_SIZE + i + shift_right) % ALPHABET_SIZE])
+        difference_module += abs(letter_stats_left['letter_count'][(ALPHABET_SIZE + i + shift_left) % ALPHABET_SIZE] *
+                                 letter_stats_right['size']
+                                 -
+                                 letter_stats_right['letter_count'][(ALPHABET_SIZE + i + shift_right) % ALPHABET_SIZE] *
+                                 letter_stats_left['size'])
     return difference_module
 
 
@@ -108,7 +97,6 @@ def caesar_hack(input_text, stats_file=''):
     with open(stats_file, 'r') as input_file:
         dict_content = input_file.read()
         letter_stats = json.loads(dict_content)
-        letter_stats = {int(k): int(v) for k, v in letter_stats.items()}
     best_shift = None
     best_difference = float('inf')
     current_stats = calculate_stats(input_text)
