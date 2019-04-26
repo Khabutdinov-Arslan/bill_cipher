@@ -21,7 +21,7 @@ def calculate_indexes():
 
 
 def get_input(input_filename):
-    if input_filename == '':
+    if input_filename is None:
         return sys.stdin.read()
     else:
         with open(input_filename, 'r') as input_file:
@@ -29,7 +29,7 @@ def get_input(input_filename):
 
 
 def return_output(output_text, output_filename):
-    if output_filename == '':
+    if output_filename is None:
         print(output_text, end='', sep='')
     else:
         with open(output_filename, 'w') as output_file:
@@ -77,19 +77,21 @@ def vigenere(input_text, shift_string, mode):
 def calculate_stats(input_text):
     all_characters_count = collections.Counter(input_text.lower())
     stats = dict()
-    stats['letter_count'] = [all_characters_count[process_letter('a', i)] for i in range(ALPHABET_SIZE)]
-    stats['size'] = len(input_text)
+    letter_count = [all_characters_count[process_letter('a', i)] for i in range(ALPHABET_SIZE)]
+    size = sum(letter_count)
+    for i in range(ALPHABET_SIZE):
+        letter_count[i] /= size
+    stats['letter_count'] = letter_count
+    stats['size'] = size
     return stats
 
 
 def calculate_difference(letter_stats_left, letter_stats_right, shift_left=0, shift_right=0):
     difference_module = 0
     for i in range(ALPHABET_SIZE):
-        difference_module += abs(letter_stats_left['letter_count'][(ALPHABET_SIZE + i + shift_left) % ALPHABET_SIZE] *
-                                 letter_stats_right['size']
-                                 -
-                                 letter_stats_right['letter_count'][(ALPHABET_SIZE + i + shift_right) % ALPHABET_SIZE] *
-                                 letter_stats_left['size'])
+        li = (ALPHABET_SIZE + i + shift_left) % ALPHABET_SIZE
+        ri = (ALPHABET_SIZE + i + shift_right) % ALPHABET_SIZE
+        difference_module += abs(letter_stats_left['letter_count'][li] - letter_stats_right['letter_count'][ri])
     return difference_module
 
 
@@ -144,17 +146,17 @@ def cipher_init():
     encode_parser = subparsers.add_parser('encode', help='Encode text')
     encode_parser.add_argument('--cipher', required=True, help='Caesar or Vigenere')
     encode_parser.add_argument('--key', required=True, help='Cipher key')
-    encode_parser.add_argument('--input-file', default='')
-    encode_parser.add_argument('--output-file', default='')
-    encode_parser.add_argument('--decrypt', default=False)
+    encode_parser.add_argument('--input-file', default=None)
+    encode_parser.add_argument('--output-file', default=None)
+    encode_parser.set_defaults(decrypt=False)
     encode_parser.set_defaults(func=encrypt_text)
 
     decode_parser = subparsers.add_parser('decode', help='Decode text')
     decode_parser.add_argument('--cipher', required=True, help='Caesar or Vigenere')
     decode_parser.add_argument('--key', required=True, help='Cipher key')
-    decode_parser.add_argument('--input-file', default='')
-    decode_parser.add_argument('--output-file', default='')
-    decode_parser.add_argument('--decrypt', default=True)
+    decode_parser.add_argument('--input-file', default=None)
+    decode_parser.add_argument('--output-file', default=None)
+    decode_parser.set_defaults(decrypt=True)
     decode_parser.set_defaults(func=encrypt_text)
 
     train_parser = subparsers.add_parser('train', help='Calculate language stats')
@@ -164,8 +166,8 @@ def cipher_init():
 
     hack_parser = subparsers.add_parser('hack', help='Decrypt text with unknown Caesar key')
     hack_parser.add_argument('--model-file', help='File with language stats', required=True)
-    hack_parser.add_argument('--input-file', default='')
-    hack_parser.add_argument('--output-file', default='')
+    hack_parser.add_argument('--input-file', default=None)
+    hack_parser.add_argument('--output-file', default=None)
     hack_parser.set_defaults(func=hack_text)
 
     arguments = parser.parse_args()
